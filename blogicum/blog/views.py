@@ -74,7 +74,11 @@ class CategoryPostsView(ListView):
             slug=self.kwargs['category_slug'],
             is_published=True
         )
-        return Post.objects.select_related('category', 'author', 'location').filter(
+        return Post.objects.select_related(
+            'category',
+            'author',
+            'location'
+        ).filter(
             category=category,
             is_published=True,
             pub_date__date__lt=datetime.now(),
@@ -109,7 +113,10 @@ class PostCreateView(LoginRequiredMixin, CreateView):
         return super().form_valid(form)
 
     def get_success_url(self):
-        return reverse_lazy('blog:profile', kwargs={'username': self.request.user.username})
+        return reverse_lazy(
+            'blog:profile',
+            kwargs={'username': self.request.user.username}
+        )
 
 
 class PostUpdateView(LoginRequiredMixin, UpdateView):
@@ -191,7 +198,10 @@ class ProfileUpdateView(LoginRequiredMixin, UpdateView):
         return self.request.user
 
     def get_success_url(self):
-        return reverse_lazy('blog:profile', kwargs={'username': self.request.user.username})
+        return reverse_lazy(
+            'blog:profile',
+            kwargs={'username': self.request.user.username}
+        )
 
 
 @login_required
