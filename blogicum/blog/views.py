@@ -45,9 +45,20 @@ class PostDetailView(DetailView):
     context_object_name = 'post'
 
     def get_object(self, queryset=None):
+        posts = Post.objects.select_related(
+            'category',
+            'author',
+            'location'
+        )
+
+        post = get_object_or_404(posts, id=self.kwargs['post_id'])
+
+        if post.author == self.request.user:
+            return post
+
         return get_object_or_404(
-            Post.objects.select_related('category', 'author', 'location'),
-            id=self.kwargs['id'],
+            posts,
+            id=self.kwargs['post_id'],
             category__is_published=True,
             is_published=True,
             pub_date__date__lt=datetime.now(),
@@ -123,11 +134,16 @@ class PostUpdateView(LoginRequiredMixin, UpdateView):
     model = Post
     form_class = PostForm
     template_name = 'blog/create.html'
+    pk_url_kwarg = 'post_id'
 
     def dispatch(self, request, *args, **kwargs):
         obj = self.get_object()
+
+        if not request.user.is_authenticated:
+            return redirect('blog:post_detail', post_id=obj.pk)
+
         if obj.author != request.user:
-            return redirect('blog:post_detail', pk=obj.pk)
+            return redirect('blog:post_detail', post_id=obj.pk)
 
         return super().dispatch(request, *args, **kwargs)
 
@@ -139,17 +155,18 @@ class PostUpdateView(LoginRequiredMixin, UpdateView):
         })
         return kwargs
 
-    def get_queryset(self):
-        return super().get_queryset().filter(author=self.request.user)
-
     def get_success_url(self):
-        return reverse_lazy('blog:post_detail', kwargs={'pk': self.object.id})
+        return reverse_lazy(
+            'blog:post_detail',
+            kwargs={'post_id': self.object.pk},
+        )
 
 
 class PostDeleteView(LoginRequiredMixin, DeleteView):
     model = Post
     template_name = 'blog/create.html'
     success_url = reverse_lazy('blog:index')
+    pk_url_kwarg = 'post_id'
 
     def get_queryset(self):
         return super().get_queryset().filter(author=self.request.user)
@@ -205,8 +222,8 @@ class ProfileUpdateView(LoginRequiredMixin, UpdateView):
 
 
 @login_required
-def add_comment(request, id):
-    post = get_object_or_404(Post, id=id)
+def add_comment(request, post_id):
+    post = get_object_or_404(Post, id=post_id)
     form = CommentForm(request.POST)
 
     if form.is_valid():
@@ -214,7 +231,7 @@ def add_comment(request, id):
         comment.author = request.user
         comment.post = post
         comment.save()
-    return redirect('blog:post_detail', id)
+    return redirect('blog:post_detail', post_id)
 
 
 @login_required
@@ -229,7 +246,7 @@ def edit_comment(request, post_id, comment_id):
         form = CommentForm(request.POST, instance=comment)
         if form.is_valid():
             form.save()
-            return redirect('blog:post_detail', id=post_id)
+            return redirect('blog:post_detail', post_id=post_id)
     else:
         form = CommentForm(instance=comment)
 
@@ -250,7 +267,7 @@ def delete_comment(request, post_id, comment_id):
 
     if request.method == 'POST':
         comment.delete()
-        return redirect('blog:post_detail', id=post_id)
+        return redirect('blog:post_detail', post_id=post_id)
 
     return render(request, template_name, {
         'post': post,
